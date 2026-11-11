@@ -1,3 +1,4 @@
+from typing import override
 from Model.BoardItem import BoardItem
 from Model.Npc import Npc
 from Model.Player import Player
@@ -7,7 +8,18 @@ class Forest(BoardItem):
     def __init__(self, type: str):
         super().__init__(type)
 
-    def on_stepped_by(self, character: Npc | Player, board):
+    @property
+    def is_sick(self) -> bool:
+        return self.type == "SF"
+
+    @is_sick.setter
+    def is_sick(self, value: bool) -> None:
+        self.type = "SF" if value else "HF"
+
+    @override
+    def on_stepped_by(self, character: Npc | Player, board) -> None:
+        # when meeting player, if the forest is sick, the player without material will be polluted and game over
+        # if the player has material, the forest will be healed and the player will get 1 point
         if isinstance(character, Player):
             if self.is_sick:
                 if character.has_material:
@@ -22,19 +34,12 @@ class Forest(BoardItem):
                 else:
                     board.game_over = True
                     print("You are polluted by sick forest")
+        # when meeting npc, if the forest is healthy, it will be polluted
         elif isinstance(character, Npc):
             if not self.is_sick:
                 self.is_sick = True
                 print("The forest is polluted")
 
-    @property
-    def is_sick(self) -> bool:
-        return self._type == "SF"
-
-    @is_sick.setter
-    def is_sick(self, value: bool):
-        self._type = "SF" if value else "HF"
-
-    def recover(self):
-        if self._type == "SF":
-            self._type = "HF"
+    def recover(self) -> None:
+        if self.type == "SF":
+            self.type = "HF"

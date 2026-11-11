@@ -1,24 +1,21 @@
+from Model.Constants import directions
 from Model.Board import Board
 from Model.Player import Player
 from Model.Npc import Npc
-from View.ConsoleView import ConsoleView
 
 
 class Controller:
-    def __init__(
-        self, board: Board, player: Player, npcs: list[Npc], view: ConsoleView
-    ):
+    def __init__(self, board: Board, player: Player, npcs: list[Npc]):
         self._board = board
         self._player = player
         self._npcs = npcs
-        self._view = view
 
     def get_input(self) -> tuple[str, int]:
         while True:
             direction = input("direction (u/d/l/r): ").strip().lower()
             if direction == "q":
                 return None
-            if direction in ("u", "d", "l", "r"):
+            if direction in directions:
                 break
             print("Invalid direction.")
 

@@ -17,8 +17,7 @@ def main():
 
     board.print_board()
 
-    view = ConsoleView()
-    controller = Controller(board, player, npcs, view)
+    controller = Controller(board, player, npcs)
 
     rounds = 0
     round_limit = 20

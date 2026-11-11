@@ -1,4 +1,5 @@
 import random
+from Model.Constants import directions
 from Model.Npc import Npc
 from Model.Player import Player
 
@@ -11,8 +12,6 @@ class IntellectNpc(Npc):
         return abs(pos1[0] - pos2[0]) + abs(pos1[1] - pos2[1])
 
     def move(self, board) -> tuple[str, int]:
-        directions = ["u", "d", "l", "r"]
-
         targets = []
 
         # get player pos into targets
