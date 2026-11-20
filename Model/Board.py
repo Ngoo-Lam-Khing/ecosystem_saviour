@@ -1,9 +1,9 @@
 import random
+from Model.Constants import DIRECTIONS
 from Model.Fixed import Fixed
 from Model.RepairStation import RepairStation
 from Model.Forest import Forest
 from Model.Npc import Npc
-from Model.IntellectNpc import IntellectNpc
 from Model.Player import Player
 
 
@@ -11,26 +11,83 @@ class Board:
     def __init__(self):
         self._rows: int = 0
         self._cols: int = 0
-        # only record static str, M, L, R, SF, HF, -
-        self._grid: list[list[str]] = []
+        self._grid: list[list[object]] = []
         self._forests: dict[Forest, tuple[int, int]] = {}
         self._objs: dict[Npc | Player, tuple[int, int]] = {}
         self._game_over: bool = False
+        self._events: list[str] = []
 
-    def load_board(self, file):
-        with open(file, "r") as f:
+    @property
+    def grid(self) -> list[list[object]]:
+        return self._grid
+
+    @property
+    def objs(self) -> dict[Npc | Player, tuple[int, int]]:
+        return self._objs
+
+    @property
+    def rows(self) -> int:
+        return self._rows
+
+    @property
+    def cols(self) -> int:
+        return self._cols
+
+    @property
+    def game_over(self) -> bool:
+        return self._game_over
+
+    @game_over.setter
+    def game_over(self, value: bool) -> None:
+        self._game_over = value
+
+    @property
+    def all_forests_healthy(self) -> bool:
+        return all(not forest.is_sick for forest in self._forests)
+
+    @property
+    def player_position(self) -> tuple[int, int] | None:
+        for obj, pos in self._objs.items():
+            if isinstance(obj, Player):
+                return pos
+        return None
+
+    @property
+    def healthy_forest_positions(self) -> list[tuple[int, int]]:
+        return [pos for forest, pos in self._forests.items() if not forest.is_sick]
+
+    # Event queue methods to decouple model state changes from UI/Console output
+    def add_event(self, message: str) -> None:
+        self._events.append(message)
+
+    def consume_events(self) -> list[str]:
+        events = list(self._events)
+        self._events.clear()
+        return events
+
+    def load_board(self, file: str) -> None:
+        # Clear previous board state before loading a new map file
+        self._grid.clear()
+        self._forests.clear()
+        self._objs.clear()
+        self._events.clear()
+        self._game_over = False
+
+        # Parse comma-separated tile codes into corresponding domain objects
+        with open(file, "r", encoding="utf-8") as f:
             for row, line in enumerate(f):
-                items = line.strip().split(",")
-                objects = []
+                stripped = line.strip()
+                if not stripped:
+                    continue
+                items = stripped.split(",")
+                objects: list[object] = []
 
                 for col, item in enumerate(items):
-                    if item == "M":
-                        objects.append(Fixed(item))
-                    elif item == "L":
+                    if item in ("M", "L"):
                         objects.append(Fixed(item))
                     elif item == "R":
                         objects.append(RepairStation(item))
-                    elif item == "HF" or item == "SF":
+                    elif item in ("HF", "SF"):
                         forest = Forest(item)
                         objects.append(forest)
                         self._forests[forest] = (row, col)
@@ -39,120 +96,99 @@ class Board:
 
                 self._grid.append(objects)
 
+        if not self._grid:
+            raise ValueError("Board file is empty.")
+
         self._rows = len(self._grid)
         self._cols = len(self._grid[0])
-
-    def print_board(self):
-        display_grid = [
-            [f"{str(self._grid[r][c]):^3}" for c in range(self._cols)]
-            for r in range(self._rows)
-        ]
-
-        color = {"npc": 31, "intellectnpc": 31, "player": 32}
-        for obj, (x, y) in self._objs.items():
-            # map color to npc and player for being recognizable
-            display_grid[x][
-                y
-            ] = f"\033[{color[type(obj).__name__.lower()]}m{str(obj):^3}\033[0m"
-
-        for row in display_grid:
-            print(" ".join(row))
-
-    @property
-    def game_over(self) -> bool:
-        return self._game_over
-
-    @game_over.setter
-    def game_over(self, value: bool):
-        self._game_over = value
 
     def get_position(self, obj: Npc | Player) -> tuple[int, int]:
         return self._objs[obj]
 
-    @property
-    def all_forests_healthy(self) -> bool:
-        return all(not forest.is_sick for forest in self._forests.keys())
-
-    def init_player(self, player: Player):
+    def init_player(self, player: Player) -> None:
+        player.reset()
         self._objs[player] = (0, 0)
 
-    def init_npc(self, characters: list[Npc | IntellectNpc]):
-        length = len(characters)
-        index = 0
+    def init_npc(self, npcs: list[Npc]) -> None:
+        # Collect all empty ('-') tiles not currently occupied by another character
+        occupied = set(self._objs.values())
+        available_positions = [
+            (r, c)
+            for r in range(self._rows)
+            for c in range(self._cols)
+            if self._grid[r][c] == "-" and (r, c) not in occupied
+        ]
 
-        while index < length:
-            x = random.randint(0, self._rows - 1)
-            y = random.randint(0, self._cols - 1)
-            if self._grid[x][y] == "-" and (x, y) not in self._objs.values():
-                obj = characters[index]
-                self._objs[obj] = (x, y)
-                index += 1
+        if len(available_positions) < len(npcs):
+            raise ValueError(
+                f"Not enough empty tiles ({len(available_positions)}) for {len(npcs)} NPCs."
+            )
 
-    def move_character(self, character: Npc | Player, direction: str, distance: int):
+        # Randomly assign distinct valid spawn positions to each NPC
+        chosen_positions = random.sample(available_positions, len(npcs))
+        for npc, pos in zip(npcs, chosen_positions):
+            self._objs[npc] = pos
+
+    def move_character(
+        self, character: Npc | Player, direction: str, distance: int
+    ) -> None:
         if character not in self._objs:
             return
 
         origin = self.get_position(character)
         step = 0
+        dx, dy = DIRECTIONS.get(direction, (0, 0))
+
+        # Execute movement one tile at a time to check intermediate obstacles and triggers
         for _ in range(distance):
-            moves = {"u": (-1, 0), "d": (1, 0), "l": (0, -1), "r": (0, 1)}
             x, y = self._objs[character]
-            dx, dy = moves.get(direction, (0, 0))
             nx, ny = x + dx, y + dy
 
-            # perimeter check of matrix
+            # Stop movement if the next step exceeds board boundaries
             if not (0 <= nx < self._rows and 0 <= ny < self._cols):
-                print("Over Boundary")
+                self.add_event("Over Boundary")
                 break
 
             static_target = self._grid[nx][ny]
-            # remind: '-' is not a object
-
-            # check if encounter fixed unenterable site
-            if (
-                hasattr(static_target, "is_enterable")
-                and not static_target.is_enterable
-            ):
-                print(f"{static_target} is not enterable")
+            # Note: empty floor tiles '-' are raw strings and default to enterable=True
+            if not getattr(static_target, "is_enterable", True):
+                self.add_event(f"{static_target} is not enterable")
                 break
 
-            # npc/player can enter/encounter each others
-            # repair stations, forests, normal place
-            # so update position and deal with afterward process
             self._objs[character] = (nx, ny)
+            step += 1
 
-            # check collision between npc and player
+            # Check for player-NPC encounter on every intermediate tile
             self._check_character_collisions(character, (nx, ny))
             if self.game_over:
                 break
 
-            # check if steps on function site, repair and forest
+            # Trigger interactive tile effects (e.g., Forest, RepairStation)
             if hasattr(static_target, "on_stepped_by"):
                 static_target.on_stepped_by(character, self)
-
-            step += 1
+                if self.game_over:
+                    break
 
         destination = self.get_position(character)
-
-        print(
-            f"{str(character)} moved from {origin} to {destination} {'at most' if step != distance else ''}"
-        )
+        suffix = " at most" if step != distance else ""
+        self.add_event(f"{character} moved from {origin} to {destination}{suffix}")
 
     def is_valid_position(self, pos: tuple[int, int]) -> bool:
         r, c = pos
         if not (0 <= r < self._rows and 0 <= c < self._cols):
             return False
         target = self._grid[r][c]
-        return str(target) not in ("M", "L")
+        return getattr(target, "is_enterable", True)
 
-    # internal methods
-    def _check_character_collisions(self, mover: Npc | Player, pos: tuple[int, int]):
+    def _check_character_collisions(
+        self, mover: Npc | Player, pos: tuple[int, int]
+    ) -> None:
+        # End the game immediately if a Player and an NPC occupy the same coordinates
         for obj, o_pos in self._objs.items():
             if obj != mover and o_pos == pos:
-                if (
-                    isinstance(obj, Player)
-                    and isinstance(mover, Npc)
-                    or (isinstance(obj, Npc) and isinstance(mover, Player))
+                if (isinstance(obj, Player) and isinstance(mover, Npc)) or (
+                    isinstance(obj, Npc) and isinstance(mover, Player)
                 ):
-                    print("Player and NPC encountered! Game Over!")
+                    self.add_event("Player and NPC encountered! Game Over!")
                     self.game_over = True
+                    return

@@ -1,33 +1,32 @@
+from Model.Constants import round_limit
 from Model.Board import Board
+from Model.Player import Player
 from Model.Npc import Npc
 from Model.IntellectNpc import IntellectNpc
-from Model.Player import Player
-from Controller import Controller
+from View.ConsoleView import ConsoleView
+from Controller.Controller import Controller
 
 
 def main():
+    # Initialize the game components
     board = Board()
-    board.load_board("sample.txt")
-
     player = Player()
-    board.init_player(player)
-
     npcs = [IntellectNpc()] + [Npc() for _ in range(2)]
-    board.init_npc(npcs)
+    # Initialize the view and controller
+    view = ConsoleView()
+    controller = Controller(board, player, npcs, view, "sample.txt")
+    controller.new_game()
 
-    board.print_board()
-
-    controller = Controller(board, player, npcs)
-
-    rounds = 0
-    round_limit = 20
-    playing = True
-    while playing and rounds <= round_limit and not board.game_over:
-        playing = controller.run_turn()
-        rounds += 1
+    # Run the game loop
+    while controller.is_playing:
+        print(f"Turn (Current / Total): {controller.turn + 1} / {round_limit}")
+        controller.run_turn()
 
     print("Game Over")
-    print(f"You got {player.score} point{'s' if player.score > 1 else ''} in total")
+    print(f"You played {controller.turn} out of {round_limit} turns")
+    print(
+        f"You got {controller.player.score} point{'s' if controller.player.score > 1 else ''} in total"
+    )
 
 
 if __name__ == "__main__":

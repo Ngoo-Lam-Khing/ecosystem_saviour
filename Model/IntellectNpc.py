@@ -1,60 +1,52 @@
 import random
-from Model.Constants import directions
+from typing import override
+from Model.Constants import DIRECTIONS, directions
 from Model.Npc import Npc
-from Model.Player import Player
 
 
 class IntellectNpc(Npc):
-    def __init__(self, type="INPC"):
+    def __init__(self, type: str = "INPC"):
         super().__init__(type)
 
+    # get the distance from position 1 to position 2
     def _manhattan_distance(self, pos1: tuple[int, int], pos2: tuple[int, int]) -> int:
         return abs(pos1[0] - pos2[0]) + abs(pos1[1] - pos2[1])
 
+    @override
     def move(self, board) -> tuple[str, int]:
-        targets = []
+        targets: list[tuple[int, int]] = []
 
-        # get player pos into targets
-        for character in board._objs:
-            if isinstance(character, Player):
-                targets.append(board._objs[character])
-                break
-
-        for forest in board._forests:
-            if not forest.is_sick:
-                targets.append(board._forests[forest])
-
-        if len(targets) == 0:
+        # get player's position if it exists
+        if board.player_position is not None:
+            targets.append(board.player_position)
+        # combine all forests' positions
+        targets.extend(board.healthy_forest_positions)
+        # if no targets just randomly move
+        if not targets:
             return (random.choice(directions), random.randint(1, 3))
-
+        # get self position
         pos = board.get_position(self)
+        # get the closest target position from targets array
         closest_target = min(
             targets, key=lambda target: self._manhattan_distance(pos, target)
         )
-
-        best_move = None
+        # get best (direction, distance)
+        best_move: tuple[str, int] | None = None
+        # set an infinity float
         min_dist_to_target = float("inf")
-        valid_fallback_moves = []
-
-        moves = {"u": (-1, 0), "d": (1, 0), "l": (0, -1), "r": (0, 1)}
 
         # auto npc only moves 1 square a time for simplicity
-        for direction, distance in moves.items():
-            next_pos = (pos[0] + distance[0], pos[1] + distance[1])
-
-            # if next position is enterable then append fallback list
-            # check check if its distance is closer
+        for direction, (dr, dc) in DIRECTIONS.items():
+            next_pos = (pos[0] + dr, pos[1] + dc)
+            # if next position is accessible, then compute its distance and compare with min_dist_to_target
+            # if it is lesser then assign it
             if board.is_valid_position(next_pos):
-                valid_fallback_moves.append((direction, 1))
                 dist = self._manhattan_distance(next_pos, closest_target)
-
                 if dist < min_dist_to_target:
                     min_dist_to_target = dist
                     best_move = (direction, 1)
 
-        if best_move:
+        if best_move is not None:
             return best_move
-        elif valid_fallback_moves:
-            return random.choice(valid_fallback_moves)
 
-        return ("u", 1)
+        return (random.choice(directions), 1)

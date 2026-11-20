@@ -1,18 +1,20 @@
 from typing import override
 from Model.BoardItem import BoardItem
+from Model.Npc import Npc
 from Model.Player import Player
 
 
 class RepairStation(BoardItem):
-    def __init__(self, type: str):
+    def __init__(self, type: str = "R"):
         super().__init__(type)
 
     @override
-    def on_stepped_by(self, character: Player, _board):
-        # if the player steps on the repair station, it will repair the player's bag if it is not full
+    def on_stepped_by(self, character: Npc | Player, board) -> None:
         if isinstance(character, Player):
+            # Check if the player has material; if not, give them material and log the event
+            # If they already have material, log that their bag is full
             if not character.has_material:
                 character.has_material = True
-                print("Got Material")
+                board.add_event("Got Material")
             else:
-                print("Bag is Full")
+                board.add_event("Bag is Full")
