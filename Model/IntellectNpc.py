@@ -1,5 +1,5 @@
 import random
-from typing import override
+
 from Model.Constants import DIRECTIONS, directions
 from Model.Npc import Npc
 
@@ -12,7 +12,6 @@ class IntellectNpc(Npc):
     def _manhattan_distance(self, pos1: tuple[int, int], pos2: tuple[int, int]) -> int:
         return abs(pos1[0] - pos2[0]) + abs(pos1[1] - pos2[1])
 
-    @override
     def move(self, board) -> tuple[str, int]:
         targets: list[tuple[int, int]] = []
 

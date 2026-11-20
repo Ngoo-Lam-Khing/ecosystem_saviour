@@ -1,4 +1,4 @@
-from typing import Literal, override
+# from typing import Literal, override
 
 
 class BoardItem:
@@ -13,10 +13,10 @@ class BoardItem:
 
     # Define a type alias for valid board item types
     # Literal is used to restrict the type to specific string values
-    ValidTypes = Literal["M", "L", "R", "SF", "HF", "-"]
+    # ValidTypes = Literal["M", "L", "R", "SF", "HF", "-"]
 
     # Initialize the BoardItem with a type, defaulting to "-" for an empty square
-    def __init__(self, type: ValidTypes = "-"):
+    def __init__(self, type: str = "-"):
         self.type = type
 
     # Return the string representation of the BoardItem, which is its type

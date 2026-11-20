@@ -1,4 +1,3 @@
-from typing import override
 from Model.BoardItem import BoardItem
 from Model.Npc import Npc
 from Model.Player import Player
@@ -18,7 +17,6 @@ class Forest(BoardItem):
     def is_sick(self, value: bool) -> None:
         self.type = "SF" if value else "HF"
 
-    @override
     def on_stepped_by(self, character: Npc | Player, board) -> None:
         # when meeting player, if the forest is sick, the player without material will be polluted and game over
         if isinstance(character, Player):
